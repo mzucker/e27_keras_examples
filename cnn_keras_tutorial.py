@@ -32,14 +32,14 @@ def main():
 
     # input is 28 x 28 x 1
 
-    # kernel shape is (32, 3, 3, 1)
+    # kernel shape is (3, 3, 1, 32)
     model.add(keras.layers.Conv2D(32, kernel_size=(3, 3),
                                   activation='relu',
                                   input_shape=input_shape))
 
     # shape is now 26 x 26 x 32
 
-    # kernel shape is (64, 3, 3, 32)
+    # kernel shape is (3, 3, 32, 64)
     model.add(keras.layers.Conv2D(64, (3, 3), activation='relu'))
 
     # shape is now 24 x 24 x 64
