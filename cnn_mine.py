@@ -65,13 +65,7 @@ def main():
                   optimizer=keras.optimizers.Adadelta(),
                   metrics=['accuracy'])
 
-
-    for layer in model.layers:
-        print('layer {} has input_shape {}, output_shape {}'.format(
-            layer.name, layer.input_shape, layer.output_shape))
-    
-    trainable_count =  keras.utils.layer_utils.count_params(model.trainable_weights)
-    print('total trainable parameters:', trainable_count)
+    model.summary()
     
     model.fit(x_train, y_train,
               batch_size=BATCH_SIZE,

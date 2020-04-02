@@ -35,7 +35,7 @@ def normalize(x):
 
 def tile(images, cols, margin, bgcolor=63, zoom=1):
 
-    irows, icols = images.shape[1:]
+    irows, icols, chans = images.shape[1:]
 
     rows = int(np.ceil(len(images)/cols))
 
@@ -46,7 +46,7 @@ def tile(images, cols, margin, bgcolor=63, zoom=1):
     x = margin
     col = 0
 
-    vis = np.ones((h, w), dtype=images.dtype) * bgcolor
+    vis = np.ones((h, w, chans), dtype=images.dtype) * bgcolor
 
     for img in images:
         vis[y:y+irows, x:x+icols] = img
@@ -56,6 +56,9 @@ def tile(images, cols, margin, bgcolor=63, zoom=1):
             x = margin
             col = 0
             y += irows + margin
+
+    if chans == 1:
+        vis = vis.reshape((h, w))
 
     if zoom > 1:
         vis = cv2.resize(vis, (zoom*w, zoom*h), interpolation=cv2.INTER_NEAREST)
@@ -136,12 +139,15 @@ def visualize_conv_weights(model):
                 
             print('display_kernel is', display_kernel.shape, display_kernel.dtype)
 
-            assert display_kernel.shape[2] == 1
+            assert display_kernel.shape[2] in (1, 3)
             assert display_kernel.shape[0] == display_kernel.shape[1]
 
-            sz = display_kernel.shape[0]
+            h, w, chan, count = display_kernel.shape
+            assert chan in (1, 3)
 
-            showme = display_kernel.T.reshape(-1, sz, sz)
+            showme = display_kernel.transpose((3, 0, 1, 2))
+            assert showme.shape ==  (count, h, w, chan)
+            
             showme = normalize(showme)
 
             kvis = tile(showme, cols=8, margin=1, zoom=8)
@@ -151,7 +157,9 @@ def visualize_conv_weights(model):
             cv2.imshow('win', kvis)
             while cv2.waitKey(5) < 0: pass
 
-        elif not isinstance(layer, keras.layers.Dropout):
+        elif not (isinstance(layer, keras.layers.Dropout) or
+                  isinstance(layer, keras.layers.InputLayer) or
+                  isinstance(layer, keras.layers.Activation)):
             print('stopping visualization since I found', type(layer).__name__)
             break
 
@@ -164,23 +172,24 @@ def main():
     model = keras.models.load_model(sys.argv[1])
 
     is_conv = False
+    conv_input_shape = None
 
     for layer in model.layers:
-        print('layer {} has input_shape {}, output_shape {}'.format(
-            layer.name, layer.input_shape, layer.output_shape))
         if isinstance(layer, keras.layers.Conv2D):
             is_conv = True
+            conv_input_shape = layer.input_shape[1:]
+            break
 
     activation = model.layers[-1].activation.__name__
     assert activation in ('tanh', 'softmax')
             
-    trainable_count =  keras.utils.layer_utils.count_params(model.trainable_weights)
-    print('total trainable parameters:', trainable_count)
+    model.summary()
 
     mnist_data = keras.datasets.mnist.load_data()
     
     (x_train, y_train), (x_test, y_test) = mnist_preprocess.process_datasets(
-        mnist_data, conv=is_conv, activation=activation)
+        mnist_data, conv=is_conv, activation=activation,
+        conv_input_shape=conv_input_shape)
 
     if is_conv:
         visualize_conv_weights(model)

@@ -18,8 +18,28 @@ IMG_ROWS, IMG_COLS = 28, 28
 
 NUM_CLASSES = 10
 
+def pad(x, input_shape):
+
+    n = len(x)
+    assert x.shape == (n, IMG_ROWS, IMG_COLS, 1)
+
+    irows, icols, ichan = input_shape
+
+    assert irows >= IMG_ROWS
+    assert icols >= IMG_COLS
+    assert ichan >= 1
+
+    result = np.zeros((n,) + input_shape, dtype=x.dtype)
+
+    row = (irows - IMG_ROWS)//2
+    col = (icols - IMG_COLS)//2
+
+    result[:, row:row+IMG_ROWS, col:col+IMG_COLS, :] = x
+
+    return result
+
 # convert from stack of images to stack of row vectors
-def process_images(x, conv):
+def process_images(x, conv, conv_input_shape):
 
     # reshape 3D array -> 2D array
     assert x.shape[1:] == (IMG_ROWS, IMG_COLS)
@@ -39,6 +59,13 @@ def process_images(x, conv):
             input_shape = (IMG_ROWS, IMG_COLS, 1)
 
         x = x.reshape((-1,) + input_shape)
+
+        if input_shape is not None:
+            x = pad(x, conv_input_shape)
+
+    elif input_shape is not None:
+        
+        raise RuntimeError('input_shape is only for conv. nets')
     
     return x
 
@@ -59,11 +86,11 @@ def posneg1_from_labels(labels):
     return y
 
 
-def process_dataset(img, lbl, conv, activation):
+def process_dataset(img, lbl, conv, activation, conv_input_shape=None):
 
     assert activation in ('tanh', 'softmax')
 
-    x = process_images(img, conv)
+    x = process_images(img, conv, conv_input_shape)
 
     if activation == 'tanh':
         y = posneg1_from_labels(lbl)
@@ -72,18 +99,24 @@ def process_dataset(img, lbl, conv, activation):
 
     return x, y
 
-def process_datasets(datasets, conv, activation):
+def process_datasets(datasets, conv, activation, conv_input_shape=None):
     
     outputs = []
     
     for (img, lbl) in datasets:
-        outputs.append(process_dataset(img, lbl, conv, activation))
+        outputs.append(process_dataset(img, lbl,
+                                       conv=conv,
+                                       activation=activation,
+                                       conv_input_shape=conv_input_shape))
         
     return tuple(outputs)
     
     
-def load_datasets(conv, activation):
+def load_datasets(conv, activation, conv_input_shape=None):
     datasets = keras.datasets.mnist.load_data()
-    return process_datasets(datasets, conv, activation)
+    return process_datasets(datasets,
+                            conv=conv,
+                            activation=activation,
+                            conv_input_shape=conv_input_shape)
 
     
